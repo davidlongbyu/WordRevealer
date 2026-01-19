@@ -1,78 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Word Finder</title>
-    <!-- Include Bootstrap CSS (you'll need to link to the Bootstrap CSS file) -->
-    <link rel="stylesheet" href="path-to-bootstrap.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Wordle Helper</title>
+
+<style>
+  :root {
+    --gray: #787c7e;
+    --yellow: #c9b458;
+    --green: #6aaa64;
+    --bg: #f5f5f5;
+  }
+
+  body {
+    margin: 0;
+    padding: 1rem;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .guess-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .letter {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 6px;
+    background: var(--gray);
+    color: white;
+    font-size: 1.4rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .state-0 { background: var(--gray); }
+  .state-1 { background: var(--yellow); }
+  .state-2 { background: var(--green); }
+
+  button {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: none;
+    background: #333;
+    color: white;
+  }
+
+  .words {
+    margin-top: 1rem;
+    background: white;
+    border-radius: 6px;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .word {
+    padding: 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    font-size: 1.1rem;
+  }
+
+  .word:active {
+    background: #ddd;
+  }
+</style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Word Finder</h1>
-        <form id="word-finder-form">
-            <div class="form-group">
-                <label for="input-letters">Enter Letters:</label>
-                <input type="text" class="form-control" id="input-letters" placeholder="Enter letters">
-            </div>
-            <div class="form-group">
-                <label for="dictionary-select">Select Dictionary:</label>
-                <select class="form-control" id="dictionary-select">
-                    <option value="wordle">Wordle</option>
-                    <option value="scrabble">Scrabble</option>
-                </select>
-            </div>
-            <button type="button" class="btn btn-primary" id="find-words-button">Find Words</button>
-            <button type="button" class="btn btn-secondary" id="reset-button">Reset</button>
-        </form>
-        <div id="results">
-            <!-- Display results here -->
-        </div>
-    </div>
 
-    <!-- Include Bootstrap JS (you'll need to link to the Bootstrap JS file) -->
-    <script src="path-to-bootstrap.js"></script>
+<h1>Wordle Helper</h1>
 
-    <script>
-        document.getElementById("find-words-button").addEventListener("click", function() {
-            // Get user input values
-            const letters = document.getElementById("input-letters").value;
-            const dictionary = document.getElementById("dictionary-select").value;
-            
-            // Perform client-side word list generation and display results
-            const results = generateWordList(letters, dictionary);
+<div id="guess" class="guess-row"></div>
+<button onclick="applyGuess()">Add Guess</button>
 
-            // Display results
-            displayResults(results);
-        });
+<div class="words" id="wordList"></div>
 
-        document.getElementById("reset-button").addEventListener("click", function() {
-            // Reset the form and results
-            document.getElementById("word-finder-form").reset();
-            document.getElementById("results").innerHTML = "";
-        });
+<script>
+/* 🔤 Replace with full Wordle list later */
+const WORDS = [
+  "good","food","flood","odder","adder","eerie","sheep","piano","cigar",
+  "rebut","sissy","humph","awake","blush","focal","evade","naval","serve"
+];
 
-        // Client-side word list generation function (you need to implement this)
-        function generateWordList(letters, dictionary) {
-            // Implement word list generation based on client-side logic
-            // and return the results as an array
-            // Example logic:
-            const results = ["word1", "word2", "word3"]; // Replace with actual results
-            return results;
-        }
+let candidates = [...WORDS];
+let guess = [];
+let states = [];
 
-        // Display results in the HTML
-        function displayResults(results) {
-            const resultsContainer = document.getElementById("results");
-            resultsContainer.innerHTML = "<h3>Matching Words:</h3>";
-            const ul = document.createElement("ul");
-            results.forEach((word) => {
-                const li = document.createElement("li");
-                li.textContent = word;
-                ul.appendChild(li);
-            });
-            resultsContainer.appendChild(ul);
-        }
-    </script>
+const constraints = {
+  greens: Array(5).fill(null),
+  yellows: Array.from({ length: 5 }, () => new Set()),
+  minCount: {},
+  maxCount: {}
+};
+
+function initGuess(word = "") {
+  guess = word.padEnd(5).slice(0,5).split("");
+  states = Array(5).fill(0);
+
+  const row = document.getElementById("guess");
+  row.innerHTML = "";
+
+  guess.forEach((c, i) => {
+    const div = document.createElement("div");
+    div.className = "letter state-0";
+    div.textContent = c.toUpperCase();
+    div.onclick = () => cycleState(i, div);
+    row.appendChild(div);
+  });
+}
+
+function cycleState(i, el) {
+  states[i] = (states[i] + 1) % 3;
+  el.className = "letter state-" + states[i];
+}
+
+function applyGuess() {
+  if (guess.some(c => !c.trim())) return;
+
+  processGuess();
+  candidates = candidates.filter(matchesConstraints);
+  renderWords();
+  initGuess();
+}
+
+function processGuess() {
+  const tempCount = {};
+
+  guess.forEach((l, i) => {
+    if (states[i] > 0) {
+      tempCount[l] = (tempCount[l] || 0) + 1;
+    }
+  });
+
+  guess.forEach((l, i) => {
+    const s = states[i];
+
+    if (s === 2) {
+      constraints.greens[i] = l;
+      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, tempCount[l]);
+    }
+
+    if (s === 1) {
+      constraints.yellows[i].add(l);
+      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, tempCount[l]);
+    }
+
+    if (s === 0) {
+      if (tempCount[l]) {
+        constraints.maxCount[l] = tempCount[l];
+      } else {
+        constraints.maxCount[l] = 0;
+      }
+    }
+  });
+}
+
+function matchesConstraints(word) {
+  // Greens
+  for (let i = 0; i < 5; i++) {
+    if (constraints.greens[i] && word[i] !== constraints.greens[i]) {
+      return false;
+    }
+    if (constraints.yellows[i].has(word[i])) {
+      return false;
+    }
+  }
+
+  // Letter counts
+  const counts = {};
+  for (const c of word) counts[c] = (counts[c] || 0) + 1;
+
+  for (const l in constraints.minCount) {
+    if ((counts[l] || 0) < constraints.minCount[l]) return false;
+  }
+
+  for (const l in constraints.maxCount) {
+    if ((counts[l] || 0) > constraints.maxCount[l]) return false;
+  }
+
+  return true;
+}
+
+function renderWords() {
+  const list = document.getElementById("wordList");
+  list.innerHTML = "";
+
+  candidates.sort().forEach(w => {
+    const div = document.createElement("div");
+    div.className = "word";
+    div.textContent = w;
+    div.onclick = () => initGuess(w);
+    list.appendChild(div);
+  });
+}
+
+initGuess();
+renderWords();
+</script>
+
 </body>
 </html>
