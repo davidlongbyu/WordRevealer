@@ -139,6 +139,7 @@ let guess = Array(5).fill("");
 let states = Array(5).fill(0);
 let cursor = 0;
 const keyState = {};
+const APP_VERSION = "0.0.1";
 
 const constraints = {
   greens:Array(5).fill(null),
@@ -155,6 +156,14 @@ function ready() {
   candidates = [...ALLOWED];
   drawGuess();
   render();
+  renderVersion();
+}
+
+function renderVersion() {
+  const el = document.getElementById("version");
+  if (el) {
+    el.textContent = `Version ${APP_VERSION}`;
+  }
 }
 
 function drawGuess() {
@@ -284,6 +293,8 @@ document.querySelectorAll(".key").forEach(k=>{
 
 ready();
 </script>
-
+<footer id="version"
+        style="text-align:center; margin-top:1rem; font-size:0.8rem; color:#666;">
+</footer>
 </body>
 </html>
