@@ -111,7 +111,12 @@
 
 <body>
 
-<h1>Wordle Helper</h1>
+<h1>
+  Wordle Helper
+  <span id="version"
+        style="font-size:0.6em; font-weight:normal; color:#666;">
+  </span>
+</h1>
 
 <div id="guess" class="guess-row"></div>
 <button onclick="applyGuess()">Enter</button>
@@ -293,8 +298,5 @@ document.querySelectorAll(".key").forEach(k=>{
 
 ready();
 </script>
-<footer id="version"
-        style="text-align:center; margin-top:1rem; font-size:0.8rem; color:#666;">
-</footer>
 </body>
 </html>
