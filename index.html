@@ -25,12 +25,7 @@
 
   h1 { text-align:center; }
 
-  .guess-row {
-    display:flex;
-    justify-content:center;
-    gap:.4rem;
-    margin-bottom:.75rem;
-  }
+  .guess-row { display:flex; justify-content:center; gap:.4rem; margin-bottom:.75rem; }
 
   .tile {
     width:3rem;
@@ -50,15 +45,7 @@
   .state-1 { background:var(--yellow); }
   .state-2 { background:var(--green); }
 
-  button {
-    width:100%;
-    padding:.75rem;
-    font-size:1rem;
-    border-radius:6px;
-    border:none;
-    background:#333;
-    color:white;
-  }
+  button { width:100%; padding:.75rem; font-size:1rem; border-radius:6px; border:none; background:#333; color:white; }
 
   .words {
     margin-top:1rem;
@@ -85,12 +72,7 @@
     padding:.5rem;
   }
 
-  .key-row {
-    display:flex;
-    justify-content:center;
-    gap:.25rem;
-    margin-bottom:.25rem;
-  }
+  .key-row { display:flex; justify-content:center; gap:.25rem; margin-bottom:.25rem; }
 
   .key {
     flex:1;
@@ -146,7 +128,7 @@ let guess = Array(5).fill("");
 let states = Array(5).fill(0);
 let cursor = 0;
 const keyState = {};
-const APP_VERSION = "0.0.5";
+const APP_VERSION = "0.0.6";
 
 const constraints = {
   greens:Array(5).fill(null),
@@ -238,6 +220,7 @@ function processGuess() {
 }
 
 function matches(word) {
+  word = word.toUpperCase(); // <-- normalize candidate word
   const cnt = {};
 
   for(let i=0;i<5;i++){
@@ -263,7 +246,7 @@ function matches(word) {
 }
 
 function applyGuess() {
-  if(guess.some(c=>!c)) return; // incomplete guess
+  if(guess.some(c=>!c)) return;
 
   processGuess();
 
