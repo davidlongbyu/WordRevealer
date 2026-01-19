@@ -204,14 +204,22 @@ function backspace(){
   }
 }
 
-function applyGuess(){
-  if(guess.some(c=>!c))return;
+function applyGuess() {
+  if (guess.some(c => !c)) return; // incomplete guess
+
+  // Process the guess to update constraints and keyboard
   processGuess();
-  candidates=candidates.filter(matches);
+
+  // Filter ALL allowed words against constraints, not just previous candidates
+  candidates = ALLOWED.filter(matches);
+
+  // Render the list
   render();
-  guess=Array(5).fill("");
-  states=Array(5).fill(0);
-  cursor=0;
+
+  // Reset guess row
+  guess = Array(5).fill("");
+  states = Array(5).fill(0);
+  cursor = 0;
   drawGuess();
 }
 
