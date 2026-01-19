@@ -217,8 +217,13 @@ function processGuess(){
       constraints.yellows[i].add(l);
       constraints.minCount[l]=Math.max(constraints.minCount[l]||0,temp[l]);
     }
-    if(s===0){
-      constraints.maxCount[l]=temp[l]||0;
+    if (s === 0) {
+      const limit = temp[l] || 0;
+      if (constraints.maxCount[l] === undefined) {
+        constraints.maxCount[l] = limit;
+      } else {
+        constraints.maxCount[l] = Math.min(constraints.maxCount[l], limit);
+      }
     }
     keyState[l]=Math.max(keyState[l]||0,s);
   });
