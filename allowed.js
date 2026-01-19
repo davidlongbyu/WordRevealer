@@ -2,14 +2,15 @@
 // Loads the NYT Wordle allowed guesses list (includes all solutions)
 
 window.ALLOWED = [];
-
-fetch("https://raw.githubusercontent.com/tabatkins/wordle-list/main/words.txt")
+window.ALLOWED_LOADED = fetch(
+  "https://raw.githubusercontent.com/tabatkins/wordle-list/main/words.txt"
+)
   .then(r => r.text())
   .then(text => {
     window.ALLOWED = text
       .split("\n")
       .map(w => w.trim())
-      .filter(w => w.length === 5);
+      .filter(w => w.length===5);
     console.log(`Loaded ${ALLOWED.length} allowed guesses`);
   })
   .catch(err => {
