@@ -9,10 +9,8 @@ window.ALLOWED_LOADED = fetch(
   .then(text => {
     window.ALLOWED = text
       .split("\n")
-      .map(w => w.trim())
+      .map(w => w.trim().toUpperCase())
       .filter(w => w.length===5);
     console.log(`Loaded ${ALLOWED.length} allowed guesses`);
   })
-  .catch(err => {
-    console.error("Failed to load allowed guesses list", err);
-  });
+  .catch(err => console.error("Failed to load allowed guesses list", err));
