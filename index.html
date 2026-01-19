@@ -154,14 +154,12 @@ const constraints = {
 };
 
 function ready() {
-  if (!window.ALLOWED.length || !window.SOLUTIONS.length) {
-    setTimeout(ready, 50);
-    return;
-  }
-  candidates = [...ALLOWED];
-  drawGuess();
-  render();
-  renderVersion();
+  Promise.all([window.ALLOWED_LOADED, window.SOLUTIONS_LOADED]).then(() => {
+    candidates = [...ALLOWED];
+    drawGuess();
+    render();
+    renderVersion();   // now guaranteed to run after fetches
+  }).catch(err => console.error("Failed to load word lists", err));
 }
 
 function renderVersion() {
