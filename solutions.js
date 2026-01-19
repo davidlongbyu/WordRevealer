@@ -9,10 +9,8 @@ window.SOLUTIONS_LOADED = fetch(
   .then(text => {
     window.SOLUTIONS = text
       .split("\n")
-      .map(w => w.trim())
+      .map(w => w.trim().toUpperCase())
       .filter(w => w.length===5);
-    console.log(`Loaded ${SOLUTIONS.length} solutions`);
+    console.log('Loaded ${SOLUTIONS.length} solutions');
   })
-  .catch(err => {
-    console.error("Failed to load solutions list", err);
-  });
+  .catch(err => console.error("Failed to load solutions list", err));
