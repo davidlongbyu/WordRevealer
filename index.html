@@ -5,79 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Wordle Helper</title>
 
+<script src="solutions.js"></script>
+<script src="allowed.js"></script>
+
 <style>
   :root {
-    --gray: #787c7e;
-    --yellow: #c9b458;
-    --green: #6aaa64;
-    --bg: #f5f5f5;
+    --gray:#787c7e;
+    --yellow:#c9b458;
+    --green:#6aaa64;
+    --bg:#f5f5f5;
   }
 
   body {
-    margin: 0;
-    padding: 1rem;
+    margin:0;
+    padding:1rem 1rem 7rem;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--bg);
+    background:var(--bg);
   }
 
-  h1 {
-    text-align: center;
-    margin-bottom: 1rem;
-  }
+  h1 { text-align:center; }
 
   .guess-row {
-    display: flex;
-    justify-content: center;
-    gap: 0.4rem;
-    margin-bottom: 0.75rem;
+    display:flex;
+    justify-content:center;
+    gap:.4rem;
+    margin-bottom:.75rem;
   }
 
-  .letter {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 6px;
-    background: var(--gray);
-    color: white;
-    font-size: 1.4rem;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
+  .tile {
+    width:3rem;
+    height:3rem;
+    border-radius:6px;
+    background:var(--gray);
+    color:white;
+    font-size:1.4rem;
+    font-weight:bold;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    user-select:none;
   }
 
-  .state-0 { background: var(--gray); }
-  .state-1 { background: var(--yellow); }
-  .state-2 { background: var(--green); }
+  .state-0 { background:var(--gray); }
+  .state-1 { background:var(--yellow); }
+  .state-2 { background:var(--green); }
 
   button {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
-    border-radius: 6px;
-    border: none;
-    background: #333;
-    color: white;
+    width:100%;
+    padding:.75rem;
+    font-size:1rem;
+    border-radius:6px;
+    border:none;
+    background:#333;
+    color:white;
   }
 
   .words {
-    margin-top: 1rem;
-    background: white;
-    border-radius: 6px;
-    max-height: 40vh;
-    overflow-y: auto;
+    margin-top:1rem;
+    background:white;
+    border-radius:6px;
+    max-height:35vh;
+    overflow-y:auto;
   }
 
   .word {
-    padding: 0.5rem;
-    text-align: center;
-    border-bottom: 1px solid #eee;
-    font-size: 1.1rem;
+    padding:.5rem;
+    text-align:center;
+    border-bottom:1px solid #eee;
+    font-size:1.1rem;
   }
 
-  .word:active {
-    background: #ddd;
+  .keyboard {
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background:#ddd;
+    padding:.5rem;
   }
+
+  .key-row {
+    display:flex;
+    justify-content:center;
+    gap:.25rem;
+    margin-bottom:.25rem;
+  }
+
+  .key {
+    flex:1;
+    padding:.6rem 0;
+    background:#999;
+    color:white;
+    border-radius:4px;
+    text-align:center;
+    font-weight:bold;
+    user-select:none;
+  }
+
+  .key.wide { flex:1.5; }
+  .key.state-0 { background:var(--gray); }
+  .key.state-1 { background:var(--yellow); }
+  .key.state-2 { background:var(--green); }
 </style>
 </head>
 
@@ -86,131 +114,170 @@
 <h1>Wordle Helper</h1>
 
 <div id="guess" class="guess-row"></div>
-<button onclick="applyGuess()">Add Guess</button>
+<button onclick="applyGuess()">Enter</button>
+
+<label style="display:block;text-align:center;margin-top:.5rem;">
+  <input type="checkbox" id="solutionsOnly">
+  Show only possible solutions
+</label>
 
 <div class="words" id="wordList"></div>
 
-<script>
-/* 🔤 Replace with full Wordle list later */
-const WORDS = [
-  "good","food","flood","odder","adder","eerie","sheep","piano","cigar",
-  "rebut","sissy","humph","awake","blush","focal","evade","naval","serve"
-];
+<div class="keyboard">
+  <div class="key-row">Q W E R T Y U I O P</div>
+  <div class="key-row">A S D F G H J K L</div>
+  <div class="key-row">
+    <div class="key wide">⌫</div>
+    Z X C V B N M
+    <div class="key wide">⏎</div>
+  </div>
+</div>
 
-let candidates = [...WORDS];
-let guess = [];
-let states = [];
+<script>
+let candidates = [];
+let guess = Array(5).fill("");
+let states = Array(5).fill(0);
+let cursor = 0;
+const keyState = {};
 
 const constraints = {
-  greens: Array(5).fill(null),
-  yellows: Array.from({ length: 5 }, () => new Set()),
-  minCount: {},
-  maxCount: {}
+  greens:Array(5).fill(null),
+  yellows:Array.from({length:5},()=>new Set()),
+  minCount:{},
+  maxCount:{}
 };
 
-function initGuess(word = "") {
-  guess = word.padEnd(5).slice(0,5).split("");
-  states = Array(5).fill(0);
+function ready() {
+  if (!window.ALLOWED.length || !window.SOLUTIONS.length) {
+    setTimeout(ready, 50);
+    return;
+  }
+  candidates = [...ALLOWED];
+  drawGuess();
+  render();
+}
 
+function drawGuess() {
   const row = document.getElementById("guess");
   row.innerHTML = "";
-
-  guess.forEach((c, i) => {
-    const div = document.createElement("div");
-    div.className = "letter state-0";
-    div.textContent = c.toUpperCase();
-    div.onclick = () => cycleState(i, div);
-    row.appendChild(div);
+  guess.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className=`tile state-${states[i]}`;
+    d.textContent=c;
+    d.onclick=()=>cycle(i,d);
+    row.appendChild(d);
   });
 }
 
-function cycleState(i, el) {
-  states[i] = (states[i] + 1) % 3;
-  el.className = "letter state-" + states[i];
+function cycle(i,el){
+  if(!guess[i])return;
+  states[i]=(states[i]+1)%3;
+  el.className=`tile state-${states[i]}`;
 }
 
-function applyGuess() {
-  if (guess.some(c => !c.trim())) return;
+function typeLetter(l){
+  if(cursor<5){
+    guess[cursor]=l;
+    cursor++;
+    drawGuess();
+  }
+}
 
+function backspace(){
+  if(cursor>0){
+    cursor--;
+    guess[cursor]="";
+    states[cursor]=0;
+    drawGuess();
+  }
+}
+
+function applyGuess(){
+  if(guess.some(c=>!c))return;
   processGuess();
-  candidates = candidates.filter(matchesConstraints);
-  renderWords();
-  initGuess();
+  candidates=candidates.filter(matches);
+  render();
+  guess=Array(5).fill("");
+  states=Array(5).fill(0);
+  cursor=0;
+  drawGuess();
 }
 
-function processGuess() {
-  const tempCount = {};
+function processGuess(){
+  const temp={};
+  guess.forEach((l,i)=>{ if(states[i]>0) temp[l]=(temp[l]||0)+1; });
 
-  guess.forEach((l, i) => {
-    if (states[i] > 0) {
-      tempCount[l] = (tempCount[l] || 0) + 1;
+  guess.forEach((l,i)=>{
+    const s=states[i];
+    if(s===2){
+      constraints.greens[i]=l;
+      constraints.minCount[l]=Math.max(constraints.minCount[l]||0,temp[l]);
     }
-  });
-
-  guess.forEach((l, i) => {
-    const s = states[i];
-
-    if (s === 2) {
-      constraints.greens[i] = l;
-      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, tempCount[l]);
-    }
-
-    if (s === 1) {
+    if(s===1){
       constraints.yellows[i].add(l);
-      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, tempCount[l]);
+      constraints.minCount[l]=Math.max(constraints.minCount[l]||0,temp[l]);
     }
-
-    if (s === 0) {
-      if (tempCount[l]) {
-        constraints.maxCount[l] = tempCount[l];
-      } else {
-        constraints.maxCount[l] = 0;
-      }
+    if(s===0){
+      constraints.maxCount[l]=temp[l]||0;
     }
+    keyState[l]=Math.max(keyState[l]||0,s);
   });
+  updateKeyboard();
 }
 
-function matchesConstraints(word) {
-  // Greens
-  for (let i = 0; i < 5; i++) {
-    if (constraints.greens[i] && word[i] !== constraints.greens[i]) {
-      return false;
-    }
-    if (constraints.yellows[i].has(word[i])) {
-      return false;
-    }
+function matches(w){
+  for(let i=0;i<5;i++){
+    if(constraints.greens[i] && w[i]!==constraints.greens[i])return false;
+    if(constraints.yellows[i].has(w[i]))return false;
   }
-
-  // Letter counts
-  const counts = {};
-  for (const c of word) counts[c] = (counts[c] || 0) + 1;
-
-  for (const l in constraints.minCount) {
-    if ((counts[l] || 0) < constraints.minCount[l]) return false;
-  }
-
-  for (const l in constraints.maxCount) {
-    if ((counts[l] || 0) > constraints.maxCount[l]) return false;
-  }
-
+  const cnt={};
+  for(const c of w)cnt[c]=(cnt[c]||0)+1;
+  for(const l in constraints.minCount)if((cnt[l]||0)<constraints.minCount[l])return false;
+  for(const l in constraints.maxCount)if((cnt[l]||0)>constraints.maxCount[l])return false;
   return true;
 }
 
-function renderWords() {
-  const list = document.getElementById("wordList");
-  list.innerHTML = "";
+function render(){
+  const list=document.getElementById("wordList");
+  list.innerHTML="";
+  const solutionsOnly=document.getElementById("solutionsOnly").checked;
 
-  candidates.sort().forEach(w => {
-    const div = document.createElement("div");
-    div.className = "word";
-    div.textContent = w;
-    div.onclick = () => initGuess(w);
-    list.appendChild(div);
+  candidates
+    .filter(w=>!solutionsOnly || SOLUTIONS.includes(w))
+    .sort()
+    .forEach(w=>{
+      const d=document.createElement("div");
+      d.className="word";
+      d.textContent=w;
+      d.onclick=()=>{ guess=[...w.toUpperCase()]; cursor=5; drawGuess(); };
+      list.appendChild(d);
+    });
+}
+
+function updateKeyboard(){
+  document.querySelectorAll(".key").forEach(k=>{
+    const l=k.textContent;
+    if(!/^[A-Z]$/.test(l))return;
+    k.classList.remove("state-0","state-1","state-2");
+    if(keyState[l]!=null)k.classList.add("state-"+keyState[l]);
   });
 }
 
-initGuess();
-renderWords();
+document.addEventListener("keydown",e=>{
+  if(e.key==="Backspace")backspace();
+  else if(e.key==="Enter")applyGuess();
+  else if(/^[a-zA-Z]$/.test(e.key))typeLetter(e.key.toUpperCase());
+});
+
+document.querySelectorAll(".key").forEach(k=>{
+  k.onclick=()=>{
+    if(k.textContent==="⌫")backspace();
+    else if(k.textContent==="⏎")applyGuess();
+    else typeLetter(k.textContent);
+  };
+});
+
+ready();
 </script>
 
 </body>
