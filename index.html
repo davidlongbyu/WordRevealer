@@ -215,30 +215,40 @@ function applyGuess(){
   drawGuess();
 }
 
-function processGuess(){
-  const temp={};
-  guess.forEach((l,i)=>{ if(states[i]>0) temp[l]=(temp[l]||0)+1; });
+function processGuess() {
+  // Count green + yellow letters in this guess
+  const temp = {};
+  guess.forEach((l, i) => {
+    if (states[i] > 0) temp[l] = (temp[l] || 0) + 1;
+  });
 
-  guess.forEach((l,i)=>{
-    const s=states[i];
-    if(s===2){
-      constraints.greens[i]=l;
-      constraints.minCount[l]=Math.max(constraints.minCount[l]||0,temp[l]);
-    }
-    if(s===1){
+  guess.forEach((l, i) => {
+    const s = states[i];
+
+    if (s === 2) { // green
+      constraints.greens[i] = l;
+      // Ensure minCount accounts for all green+yellow occurrences in this guess
+      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, temp[l]);
+    } 
+    else if (s === 1) { // yellow
       constraints.yellows[i].add(l);
-      constraints.minCount[l]=Math.max(constraints.minCount[l]||0,temp[l]);
-    }
-    if (s === 0) {
-      const limit = temp[l] || 0;
+      // Yellow letters must appear at least once (or more if repeated)
+      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, temp[l]);
+    } 
+    else if (s === 0) { // gray
+      // Gray means "total occurrences in solution ≤ green+yellow count this guess"
+      const limit = temp[l] || 0; // if this letter was yellow/green elsewhere, keep that count
       if (constraints.maxCount[l] === undefined) {
         constraints.maxCount[l] = limit;
       } else {
         constraints.maxCount[l] = Math.min(constraints.maxCount[l], limit);
       }
     }
-    keyState[l]=Math.max(keyState[l]||0,s);
+
+    // Update keyboard color state
+    keyState[l] = Math.max(keyState[l] || 0, s);
   });
+  
   updateKeyboard();
 }
 
