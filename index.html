@@ -144,7 +144,7 @@ let guess = Array(5).fill("");
 let states = Array(5).fill(0);
 let cursor = 0;
 const keyState = {};
-const APP_VERSION = "0.0.2";
+const APP_VERSION = "0.0.3";
 
 const constraints = {
   greens:Array(5).fill(null),
@@ -252,31 +252,70 @@ function processGuess() {
   updateKeyboard();
 }
 
-function matches(w){
-  for(let i=0;i<5;i++){
-    if(constraints.greens[i] && w[i]!==constraints.greens[i])return false;
-    if(constraints.yellows[i].has(w[i]))return false;
+function matches(word) {
+  const cnt = {}; // count letters in candidate word
+
+  // Check green and yellow constraints
+  for (let i = 0; i < 5; i++) {
+    const w = word[i];
+    const g = constraints.greens[i];
+    const ySet = constraints.yellows[i];
+
+    // Green: must match exactly
+    if (g && w !== g) return false;
+
+    // Yellow: letter must NOT be in this position
+    if (ySet.has(w)) return false;
+
+    // Count letters for min/max checks
+    cnt[w] = (cnt[w] || 0) + 1;
   }
-  const cnt={};
-  for(const c of w)cnt[c]=(cnt[c]||0)+1;
-  for(const l in constraints.minCount)if((cnt[l]||0)<constraints.minCount[l])return false;
-  for(const l in constraints.maxCount)if((cnt[l]||0)>constraints.maxCount[l])return false;
-  return true;
+
+  // Check min counts
+  for (const l in constraints.minCount) {
+    if ((cnt[l] || 0) < constraints.minCount[l]) return false;
+  }
+
+  // Check max counts
+  for (const l in constraints.maxCount) {
+    if ((cnt[l] || 0) > constraints.maxCount[l]) return false;
+  }
+
+  return true; // candidate word passes all constraints
 }
 
-function render(){
-  const list=document.getElementById("wordList");
-  list.innerHTML="";
-  const solutionsOnly=document.getElementById("solutionsOnly").checked;
+function render() {
+  const list = document.getElementById("wordList");
+  list.innerHTML = "";
+
+  // Ensure word lists are loaded before rendering
+  if (!ALLOWED.length || !SOLUTIONS.length) return;
+
+  const solutionsOnly = document.getElementById("solutionsOnly").checked;
 
   candidates
-    .filter(w=>!solutionsOnly || SOLUTIONS.includes(w))
+    .filter(w => {
+      // Filter based on Wordle constraints
+      if (!matches(w)) return false;
+
+      // If toggle is checked, only show official solutions
+      if (solutionsOnly && !SOLUTIONS.includes(w)) return false;
+
+      return true;
+    })
     .sort()
-    .forEach(w=>{
-      const d=document.createElement("div");
-      d.className="word";
-      d.textContent=w;
-      d.onclick=()=>{ guess=[...w.toUpperCase()]; cursor=5; drawGuess(); };
+    .forEach(w => {
+      const d = document.createElement("div");
+      d.className = "word";
+      d.textContent = w;
+
+      // Clicking fills the guess row
+      d.onclick = () => {
+        guess = [...w.toUpperCase()];
+        cursor = 5;
+        drawGuess();
+      };
+
       list.appendChild(d);
     });
 }
