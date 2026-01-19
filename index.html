@@ -73,6 +73,7 @@
     text-align:center;
     border-bottom:1px solid #eee;
     font-size:1.1rem;
+    cursor:pointer;
   }
 
   .keyboard {
@@ -100,6 +101,7 @@
     text-align:center;
     font-weight:bold;
     user-select:none;
+    cursor:pointer;
   }
 
   .key.wide { flex:1.5; }
@@ -144,7 +146,7 @@ let guess = Array(5).fill("");
 let states = Array(5).fill(0);
 let cursor = 0;
 const keyState = {};
-const APP_VERSION = "0.0.4";
+const APP_VERSION = "0.0.5";
 
 const constraints = {
   greens:Array(5).fill(null),
@@ -153,20 +155,19 @@ const constraints = {
   maxCount:{}
 };
 
+// Wait until ALLOWED and SOLUTIONS lists are loaded
 function ready() {
   Promise.all([window.ALLOWED_LOADED, window.SOLUTIONS_LOADED]).then(() => {
     candidates = [...ALLOWED];
     drawGuess();
     render();
-    renderVersion();   // now guaranteed to run after fetches
+    renderVersion();
   }).catch(err => console.error("Failed to load word lists", err));
 }
 
 function renderVersion() {
   const el = document.getElementById("version");
-  if (el) {
-    el.textContent = `Version ${APP_VERSION}`;
-  }
+  if(el) el.textContent = `Version ${APP_VERSION}`;
 }
 
 function drawGuess() {
@@ -204,126 +205,100 @@ function backspace(){
   }
 }
 
-function applyGuess() {
-  if (guess.some(c => !c)) return; // incomplete guess
+function processGuess() {
+  const temp = {};
 
-  // Process the guess to update constraints and keyboard
+  // Count green+yellow letters in this guess
+  guess.forEach((l,i)=>{
+    if(states[i]>0) temp[l]=(temp[l]||0)+1;
+  });
+
+  guess.forEach((l,i)=>{
+    const s = states[i];
+
+    if(s===2){ // green
+      constraints.greens[i]=l;
+      constraints.minCount[l] = Math.max(constraints.minCount[l]||0, temp[l]);
+    }
+    else if(s===1){ // yellow
+      constraints.yellows[i].add(l);
+      constraints.minCount[l] = Math.max(constraints.minCount[l]||0, temp[l]);
+    }
+    else if(s===0){ // gray
+      const limit = temp[l] || 0;
+      constraints.maxCount[l] = (constraints.maxCount[l] !== undefined)
+        ? Math.min(constraints.maxCount[l], limit)
+        : limit;
+    }
+
+    keyState[l] = Math.max(keyState[l]||0, s);
+  });
+
+  updateKeyboard();
+}
+
+function matches(word) {
+  const cnt = {};
+
+  for(let i=0;i<5;i++){
+    const w = word[i];
+    const g = constraints.greens[i];
+    const ySet = constraints.yellows[i];
+
+    if(g && w!==g) return false;
+    if(ySet.has(w)) return false;
+
+    cnt[w] = (cnt[w]||0)+1;
+  }
+
+  for(const l in constraints.minCount){
+    if((cnt[l]||0) < constraints.minCount[l]) return false;
+  }
+
+  for(const l in constraints.maxCount){
+    if((cnt[l]||0) > constraints.maxCount[l]) return false;
+  }
+
+  return true;
+}
+
+function applyGuess() {
+  if(guess.some(c=>!c)) return; // incomplete guess
+
   processGuess();
 
-  // Filter ALL allowed words against constraints, not just previous candidates
+  // Always filter ALL allowed words based on updated constraints
   candidates = ALLOWED.filter(matches);
 
-  // Render the list
-  render();
+  // Render candidate list
+  const list = document.getElementById("wordList");
+  if(candidates.length===0){
+    list.innerHTML="<div style='padding:1rem;text-align:center;color:red;'>No possible words match these constraints</div>";
+  } else {
+    render();
+  }
 
-  // Reset guess row
+  // Reset guess
   guess = Array(5).fill("");
   states = Array(5).fill(0);
   cursor = 0;
   drawGuess();
 }
 
-function processGuess() {
-  // Count green + yellow letters in this guess
-  const temp = {};
-  guess.forEach((l, i) => {
-    if (states[i] > 0) temp[l] = (temp[l] || 0) + 1;
-  });
-
-  guess.forEach((l, i) => {
-    const s = states[i];
-
-    if (s === 2) { // green
-      constraints.greens[i] = l;
-      // Ensure minCount accounts for all green+yellow occurrences in this guess
-      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, temp[l]);
-    } 
-    else if (s === 1) { // yellow
-      constraints.yellows[i].add(l);
-      // Yellow letters must appear at least once (or more if repeated)
-      constraints.minCount[l] = Math.max(constraints.minCount[l] || 0, temp[l]);
-    } 
-    else if (s === 0) { // gray
-      // Gray means "total occurrences in solution ≤ green+yellow count this guess"
-      const limit = temp[l] || 0; // if this letter was yellow/green elsewhere, keep that count
-      if (constraints.maxCount[l] === undefined) {
-        constraints.maxCount[l] = limit;
-      } else {
-        constraints.maxCount[l] = Math.min(constraints.maxCount[l], limit);
-      }
-    }
-
-    // Update keyboard color state
-    keyState[l] = Math.max(keyState[l] || 0, s);
-  });
-  
-  updateKeyboard();
-}
-
-function matches(word) {
-  const cnt = {}; // count letters in candidate word
-
-  // Check green and yellow constraints
-  for (let i = 0; i < 5; i++) {
-    const w = word[i];
-    const g = constraints.greens[i];
-    const ySet = constraints.yellows[i];
-
-    // Green: must match exactly
-    if (g && w !== g) return false;
-
-    // Yellow: letter must NOT be in this position
-    if (ySet.has(w)) return false;
-
-    // Count letters for min/max checks
-    cnt[w] = (cnt[w] || 0) + 1;
-  }
-
-  // Check min counts
-  for (const l in constraints.minCount) {
-    if ((cnt[l] || 0) < constraints.minCount[l]) return false;
-  }
-
-  // Check max counts
-  for (const l in constraints.maxCount) {
-    if ((cnt[l] || 0) > constraints.maxCount[l]) return false;
-  }
-
-  return true; // candidate word passes all constraints
-}
-
 function render() {
   const list = document.getElementById("wordList");
   list.innerHTML = "";
 
-  // Ensure word lists are loaded before rendering
-  if (!ALLOWED.length || !SOLUTIONS.length) return;
-
   const solutionsOnly = document.getElementById("solutionsOnly").checked;
 
   candidates
-    .filter(w => {
-      // Filter based on Wordle constraints
-      if (!matches(w)) return false;
-
-      // If toggle is checked, only show official solutions
-      if (solutionsOnly && !SOLUTIONS.includes(w)) return false;
-
-      return true;
-    })
+    .filter(w => !solutionsOnly || SOLUTIONS.includes(w))
     .sort()
     .forEach(w => {
       const d = document.createElement("div");
       d.className = "word";
       d.textContent = w;
-
-      // Clicking fills the guess row
-      d.onclick = () => {
-        guess = [...w.toUpperCase()];
-        cursor = 5;
-        drawGuess();
-      };
-
+      d.onclick = ()=>{ guess=[...w.toUpperCase()]; cursor=5; drawGuess(); };
       list.appendChild(d);
     });
 }
@@ -333,20 +308,20 @@ function updateKeyboard(){
     const l=k.textContent;
     if(!/^[A-Z]$/.test(l))return;
     k.classList.remove("state-0","state-1","state-2");
-    if(keyState[l]!=null)k.classList.add("state-"+keyState[l]);
+    if(keyState[l]!=null) k.classList.add("state-"+keyState[l]);
   });
 }
 
 document.addEventListener("keydown",e=>{
-  if(e.key==="Backspace")backspace();
-  else if(e.key==="Enter")applyGuess();
-  else if(/^[a-zA-Z]$/.test(e.key))typeLetter(e.key.toUpperCase());
+  if(e.key==="Backspace") backspace();
+  else if(e.key==="Enter") applyGuess();
+  else if(/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toUpperCase());
 });
 
 document.querySelectorAll(".key").forEach(k=>{
   k.onclick=()=>{
-    if(k.textContent==="⌫")backspace();
-    else if(k.textContent==="⏎")applyGuess();
+    if(k.textContent==="⌫") backspace();
+    else if(k.textContent==="⏎") applyGuess();
     else typeLetter(k.textContent);
   };
 });
